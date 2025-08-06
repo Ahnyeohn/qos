@@ -1,4 +1,3 @@
-/*-------------------------------------------------------------------------*/
 #pragma once
 /*-------------------------------------------------------------------------*/
 #include <stdint.h>
@@ -18,10 +17,10 @@ typedef struct {
     uint32_t input_framerate;		// 4 B
     uint32_t input_codec;			// 4 B
 
-    uint32_t input_res_width;		// 4 B
-    uint32_t input_res_height;		// 4 B
-    uint32_t input_framerate;		// 4 B
-    uint32_t input_codec;			// 4 B
+//	uint32_t input_res_width;		// 4 B
+//	uint32_t input_res_height;		// 4 B
+//	uint32_t input_framerate;		// 4 B
+//	uint32_t input_codec;			// 4 B
 } app_feat;
 /*-------------------------------------------------------------------------*/
 // app_info

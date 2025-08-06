@@ -57,6 +57,7 @@ struct rdma_device {
 	struct ibv_mr *mr;
     struct rdma_buffer *rbuf;
 };
+extern struct rdma_device *rdma_dev;
 
 int rdma_open_server(struct sockaddr_in *, size_t);
 int rdma_open_client(struct sockaddr_in *, struct sockaddr_in *, size_t);

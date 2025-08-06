@@ -1,6 +1,6 @@
 #include "rdma.h"
 
-struct rdma_device *rdma_dev;
+struct rdma_device *rdma_dev = NULL;
 
 static int rdma_open_device(int is_server)
 {
@@ -204,7 +204,7 @@ static int on_addr_resolved(struct rdma_cm_id *id)
 {
     struct rdma_queue *q = rdma_dev->queues[rdma_dev->queue_ctr];
 
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
 
 	/* Set event->id->context to struct rdma_queue */
     id->context = q;
@@ -247,7 +247,7 @@ close_device:
 
 static int on_route_resolved(struct rdma_queue *q)
 {
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
 
 	/* Send connection request */
     struct rdma_conn_param param = {};
@@ -272,7 +272,7 @@ static int on_connect_request(struct rdma_cm_id *id,
     struct rdma_queue *q = rdma_dev->queues[rdma_dev->queue_ctr];
 	rdma_dev->queue_ctr++;
 
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
 
 	/* Set event->id->context to struct rdma_queue */
     id->context = q;
@@ -319,13 +319,13 @@ static int on_connect_request(struct rdma_cm_id *id,
 
 static int on_connection(struct rdma_queue *q)
 {
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
     return 1;
 }
 
 static int on_disconnect(struct rdma_queue *q)
 {
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
 
     rdma_disconnect(q->cm_id);
     rdma_destroy_qp(q->cm_id);
@@ -342,7 +342,7 @@ static int on_disconnect(struct rdma_queue *q)
 static int on_event(struct rdma_cm_event *event)
 {
     struct rdma_queue *q = (struct rdma_queue *) event->id->context;
-    printf("%s\n", __func__);
+//	printf("%s\n", __func__);
 
     switch (event->event) {
         case RDMA_CM_EVENT_ADDR_RESOLVED:
@@ -408,7 +408,7 @@ int rdma_open_server(struct sockaddr_in *s_addr, size_t length)
 
 	/* Successfully connected with server */
 	rdma_dev->status = 1;
-	while (!rdma_get_cm_event(rdma_dev->ec[0], &event)) {
+/*	while (!rdma_get_cm_event(rdma_dev->ec[0], &event)) {
 		struct rdma_cm_event event_copy;
 
 		memcpy(&event_copy, event, sizeof(*event));
@@ -416,7 +416,7 @@ int rdma_open_server(struct sockaddr_in *s_addr, size_t length)
 
 		if (on_event(&event_copy))
 			break;
-	}
+	}*/
 
 	return 0;
 }
