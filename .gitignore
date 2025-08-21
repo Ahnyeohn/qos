@@ -2,3 +2,4 @@ rdma/*.o
 metric-collector/src/*.o
 server
 client
+tags

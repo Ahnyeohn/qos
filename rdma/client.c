@@ -1,6 +1,4 @@
 #include "rdma.h"
-#include "message.h"
-#include "metric_api.h"
 
 pthread_t client_thread;
 pthread_t worker_thread[NUM_QUEUES];

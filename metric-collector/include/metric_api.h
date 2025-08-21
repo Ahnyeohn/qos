@@ -1,5 +1,5 @@
 #pragma once
 /*-------------------------------------------------------------------------*/
 void metric_collect();
-void send_lb_message(int c, int cpu);
+int send_lb_message(int c, int cpu);
 /*-------------------------------------------------------------------------*/
