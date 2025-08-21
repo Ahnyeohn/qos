@@ -1,23 +1,26 @@
 #include "rdma.h"
 #include "metric_api.h"
 #include "message.h"
-
+#include "metrics_store.h"
+#include <stdint.h>
+#include <string.h>
+/*-------------------------------------------------------------------------*/
 pthread_t server_thread;
 pthread_t worker_thread[NUM_QUEUES];
-
+pthread_t metrics_thread;
+/*-------------------------------------------------------------------------*/
 struct sockaddr_in s_addr;
 size_t length;
-
-static int parse_and_print_payload(int cpu, const uint8_t *buf, size_t len)
+/*-------------------------------------------------------------------------*/
+static int parse_update_and_print(int cpu, const uint8_t *buf, size_t len)
 {
     size_t off = 0;
-
     app_info  ai;
     node_info ni;
     lb_signal ls;
     perf_info pi;
 
-    if (len < sizeof(app_info))  return -1;
+    if (len < off + sizeof(app_info))  return -1;
     memcpy(&ai, buf + off, sizeof(app_info));  off += sizeof(app_info);
 
     if (len < off + sizeof(node_info)) return -1;
@@ -29,9 +32,11 @@ static int parse_and_print_payload(int cpu, const uint8_t *buf, size_t len)
     if (len < off + sizeof(perf_info)) return -1;
     memcpy(&pi, buf + off, sizeof(perf_info)); off += sizeof(perf_info);
 
-    /* print */
-    printf("===== Received Metrics (CPU %d) =====\n", cpu);
+    /* Prometheus 저장소 갱신 */
+    metrics_store_update(cpu, &ai, &ni, &ls, &pi);
 
+    /* (원하면) 로그 */
+    printf("===== Received Metrics (CPU %d) =====\n", cpu);
     printf("[app info]\n");
     printf("- app_id: %u\n", ai.app_id);
     printf("- resolution: %ux%u @ %u fps\n",
@@ -52,12 +57,11 @@ static int parse_and_print_payload(int cpu, const uint8_t *buf, size_t len)
     printf("\n[perf_info]\n");
     printf("- session_id: %u, pid: %u\n", pi.session_id, pi.pid);
     printf("- avg_latency: %.2f ms, FPS: %u\n", pi.avg_latency, pi.FPS);
-
     printf("=====================================\n");
 
     return 0;
 }
-
+/*-------------------------------------------------------------------------*/
 static void *process_server(void *arg)
 {
     int ret = rdma_open_server(&s_addr, length);
@@ -66,7 +70,7 @@ static void *process_server(void *arg)
     }
     pthread_exit(NULL);
 }
-
+/*-------------------------------------------------------------------------*/
 static void *process_worker(void *arg)
 {
     int cpu = *(int *)arg;
@@ -84,8 +88,8 @@ static void *process_worker(void *arg)
         /* Recv 등록 → 완료 대기 → 데이터 소비 */
         if (rdma_recv_wr(false, cpu, length) == 0) {
             if (rdma_poll_cq(false, cpu, 1) == 0) {
-                (void)parse_and_print_payload(cpu, (const uint8_t *)q->buf, length);
-            }
+				(void)parse_update_and_print(cpu, (const uint8_t *)q->buf, length);
+			}
         }
         /* 바로 다음 수신 준비 (루프 반복) */
     }
@@ -93,7 +97,7 @@ static void *process_worker(void *arg)
     /* 도달하지 않음 */
     pthread_exit(NULL);
 }
-
+/*-------------------------------------------------------------------------*/
 static void get_addr(char *dst)
 {
     struct addrinfo *res;
@@ -114,14 +118,14 @@ static void get_addr(char *dst)
 
     freeaddrinfo(res);
 }
-
+/*-------------------------------------------------------------------------*/
 static void usage(void)
 {
     printf("[Usage] : ");
     printf("./server [-s <server ip>] [-p <port>] [-l <data size>]\n");
     exit(1);
 }
-
+/*-------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
     int option;
@@ -152,8 +156,11 @@ int main(int argc, char* argv[])
 
     /* 최소 1개 연결 성립 대기 (그 후에도 서버는 계속 수락) */
     while (!rdma_is_connected()) { usleep(1000); }
-
     printf("Successfully connected at least one client\n");
+
+	metrics_store_init(NUM_QUEUES);
+	int metrics_port = 9100;
+	pthread_create(&metrics_thread, NULL, metrics_http_server, &metrics_port);
 
     int cores[NUM_QUEUES];
     for (int i = 0; i < NUM_QUEUES; i++) {
@@ -165,3 +172,4 @@ int main(int argc, char* argv[])
     pthread_join(server_thread, NULL);
     return 0;
 }
+/*-------------------------------------------------------------------------*/

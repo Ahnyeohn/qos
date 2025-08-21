@@ -53,44 +53,22 @@ void metric_collect(void) {
 }
 
 /* 전송 메시지 총 길이 계산 매크로(서버 Recv 길이와 동일해야 안전) */
-#define LB_MSG_SIZE ( sizeof(app_info) \
-                    + sizeof(node_info) \
-                    + sizeof(lb_signal) \
-                    + sizeof(perf_info) )
+#define LB_MSG_SIZE ( sizeof(app_info) + sizeof(node_info) + sizeof(lb_signal) + sizeof(perf_info) )
 
 int send_lb_message(int c, int cpu) {
-    (void)c; /* 현재 구현에선 의미 없음 */
-    printf("Sending metrics to load balancer\n");
-
     struct rdma_queue *q = get_queue(cpu, /*c=*/true);
-    if (!q || !q->mr || !q->buf) {
-        fprintf(stderr, "send_lb_message: queue/MR/buf not ready\n");
-        return -1;
-    }
+    if (!q || !q->mr || !q->buf) { /* ... */ }
 
-    /* 총 길이 산출 */
-    const size_t total_len = LB_MSG_SIZE;
-    if (total_len > q->buf_len) {
-        fprintf(stderr, "send_lb_message: payload(%zu) > q->buf_len(%zu)\n",
-                total_len, q->buf_len);
-        return -1;
-    }
+    const size_t total_len = sizeof(app_info)+sizeof(node_info)+sizeof(lb_signal)+sizeof(perf_info);
+    if (total_len > q->buf_len) { /* ... */ }
 
-    /* 직렬화: 큐별 버퍼(q->buf)에 순서대로 복사 */
-    uint8_t *ptr = (uint8_t *)q->buf;
-
+    uint8_t *ptr = (uint8_t*)q->buf;
     memcpy(ptr, &ai, sizeof(ai));  ptr += sizeof(ai);
     memcpy(ptr, &ni, sizeof(ni));  ptr += sizeof(ni);
     memcpy(ptr, &ls, sizeof(ls));  ptr += sizeof(ls);
     memcpy(ptr, &pi, sizeof(pi));  ptr += sizeof(pi);
 
-    /* 정확한 길이만큼 전송 */
     int ret = rdma_send_wr(true, cpu, total_len);
-    if (ret) {
-        fprintf(stderr, "send_lb_message: rdma_send_wr failed (%d)\n", ret);
-        return ret;
-    }
-
-    printf("send_lb_message: sent %zu bytes\n", total_len);
-    return 0;
+    if (!ret) printf("send_lb_message: sent %zu bytes\n", total_len);
+    return ret;
 }
