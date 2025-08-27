@@ -23,7 +23,7 @@ static int rdma_open_device(int is_server)
         rdma_dev->queues[i]->connected = 0;
     }
 
-    /* event channel: 서버 1개, 클라 큐별 */
+    /* event channel: 서버 1개, 클라이언트 큐별 */
     int nr_channel = (is_server == true) ? 1 : NUM_QUEUES;
     for (i = 0; i < nr_channel; i++) {
         rdma_dev->ec[i] = rdma_create_event_channel();
@@ -33,7 +33,7 @@ static int rdma_open_device(int is_server)
         }
     }
 
-    /* cm id 생성: 서버는 1개(listen), 클라는 큐별 */
+    /* cm id 생성: 서버는 1개(listen), 클라이언트는 큐별 */
     for (i = 0; i < nr_channel; i++) {
         ret = rdma_create_id(rdma_dev->ec[i], &rdma_dev->cm_id[i], NULL, RDMA_PS_TCP);
         if (ret) {
@@ -455,7 +455,7 @@ int rdma_open_client(struct sockaddr_in *s_addr,
         }
     }
 
-    /* 클라: 최소 하나 연결되면 status=1 (on_connection에서 이미 셋업됨) */
+    /* 클라이언트: 최소 하나 연결되면 status=1 (on_connection에서 이미 셋업됨) */
     return 0;
 
 failed:

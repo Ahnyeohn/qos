@@ -20,6 +20,9 @@ qos/
 │   ├── server_run.sh
 │   └── client_run.sh
 │
+├── prometheus/
+│   └── prometheus.yml
+│
 └── README.md
 ```
 ## Run Server
@@ -31,4 +34,10 @@ qos/
 - You need to modify client's IP address.
 ```
 ./client_run.sh
+```
+## Prometheus
+- You need to modify `prometheus.yml` to set the correct target address.
+- Run Prometheus
+```
+curl http://<your prometheus ip>:9123/gpu_metrics
 ```

@@ -159,7 +159,7 @@ int main(int argc, char* argv[])
     printf("Successfully connected at least one client\n");
 
 	metrics_store_init(NUM_QUEUES);
-	int metrics_port = 9100;
+	int metrics_port = 9123;
 	pthread_create(&metrics_thread, NULL, metrics_http_server, &metrics_port);
 
     int cores[NUM_QUEUES];

@@ -83,28 +83,19 @@ size_t metrics_store_render(char *out, size_t cap)
 
         /* 공통 라벨: queue, app_id, node_id, pod_number, gpu_id */
         /* 정수 라벨은 문자열로 넣어도 무방 */
-        EMIT("qos_latency_ms{queue=\"%d\",app_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.3f\n",
-             i, ai->app_id, ni->node_id, ni->pod_number, ai->qos.latency);
-        EMIT("qos_fps{queue=\"%d\",app_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %u\n",
-             i, ai->app_id, ni->node_id, ni->pod_number, ai->qos.FPS);
+        EMIT("qos_latency_ms{queue=\"%d\",app_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.3f\n", i, ai->app_id, ni->node_id, ni->pod_number, ai->qos.latency);
+        EMIT("qos_fps{queue=\"%d\",app_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %u\n", i, ai->app_id, ni->node_id, ni->pod_number, ai->qos.FPS);
 
-        EMIT("node_cpu_utilization_percent{queue=\"%d\",node_id=\"%u\",pod=\"%u\"} %.1f\n",
-             i, ni->node_id, ni->pod_number, ni->cpu_utilization);
+        EMIT("node_cpu_utilization_percent{queue=\"%d\",node_id=\"%u\",pod=\"%u\"} %.1f\n", i, ni->node_id, ni->pod_number, ni->cpu_utilization);
 
-        EMIT("gpu_encoder_sessions{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %u\n",
-             i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.enc_sessions);
-        EMIT("gpu_encoder_utilization_percent{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.1f\n",
-             i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.enc_util);
-        EMIT("gpu_decoder_utilization_percent{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.1f\n",
-             i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.dec_util);
+        EMIT("gpu_encoder_sessions{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %u\n", i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.enc_sessions);
+        EMIT("gpu_encoder_utilization_percent{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.1f\n", i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.enc_util);
+        EMIT("gpu_decoder_utilization_percent{queue=\"%d\",gpu_id=\"%u\",node_id=\"%u\",pod=\"%u\"} %.1f\n", i, ni->gpu.gpu_id, ni->node_id, ni->pod_number, ni->gpu.dec_util);
 
-        EMIT("lb_result{queue=\"%d\",node_id=\"%u\",pod=\"%u\"} %u\n",
-             i, ni->node_id, ni->pod_number, ls->result);
+        EMIT("lb_result{queue=\"%d\",node_id=\"%u\",pod=\"%u\"} %u\n", i, ni->node_id, ni->pod_number, ls->result);
 
-        EMIT("perf_avg_latency_ms{queue=\"%d\",session_id=\"%u\",pid=\"%u\"} %.3f\n",
-             i, pi->session_id, pi->pid, pi->avg_latency);
-        EMIT("perf_fps{queue=\"%d\",session_id=\"%u\",pid=\"%u\"} %u\n",
-             i, pi->session_id, pi->pid, pi->FPS);
+        EMIT("perf_avg_latency_ms{queue=\"%d\",session_id=\"%u\",pid=\"%u\"} %.3f\n", i, pi->session_id, pi->pid, pi->avg_latency);
+        EMIT("perf_fps{queue=\"%d\",session_id=\"%u\",pid=\"%u\"} %u\n", i, pi->session_id, pi->pid, pi->FPS);
     }
 
     pthread_mutex_unlock(&g_mu);
@@ -115,7 +106,7 @@ size_t metrics_store_render(char *out, size_t cap)
 /* 아주 단순한 HTTP 서버: GET /metrics 만 응답 */
 void* metrics_http_server(void *arg)
 {
-    int port = arg ? *(int*)arg : 9100;
+    int port = arg ? *(int*)arg : 9123;
 
     int srv = socket(AF_INET, SOCK_STREAM, 0);
     if (srv < 0) { perror("socket"); return NULL; }
@@ -142,7 +133,27 @@ void* metrics_http_server(void *arg)
 
         /* 요청을 대충 소비 (간단 구현) */
         char req[1024];
-        (void)read(cli, req, sizeof(req));
+		ssize_t r1 = read(cli, req, sizeof(req) - 1);
+		(void)r1;
+
+		char method[8] = {0}, path[256] = {0};
+		if (sscanf(req, "%7s %255s", method, path) != 2) {
+			const char *bad = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n";
+			write(cli, bad, strlen(bad));
+			close(cli);
+			continue;
+		}
+
+		int is_get = (strcmp(method, "GET") == 0);
+		int is_head = (strcmp(method, "HEAD") == 0);
+
+		int path_ok = (!strcmp(path, "/gpu_metrics"));
+		if (!path_ok) {
+			const char *nf = "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n";
+			write(cli, nf, strlen(nf));
+			close(cli);
+			continue;
+		}
 
         /* 본문 작성 */
         char *body = (char*)malloc(128*1024);
