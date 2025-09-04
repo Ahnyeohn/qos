@@ -3,25 +3,39 @@
 ```markdown
 qos/
 │
-├── rdma/
-│   ├── rdma.c
-│   └── rdma.h
-│
 ├── metric-collector/
 │   ├── src/
 │   │   ├── metric_api.c
+│   │   ├── prometheus.c
 │   │   ├── server.c
 │   │   └── client.c
 │   │
 │   ├── include/
 │   │   ├── message.h
+│   │   ├── prometheus.h
 │   │   └── metric_api.h
 │   │
+│   ├── Makefile
 │   ├── server_run.sh
 │   └── client_run.sh
 │
 ├── prometheus/
 │   └── prometheus.yml
+│
+├── k8s-rdma/
+│       ├── Dockerfile
+│       ├── Makefile
+│       ├── test-rdma-server.yaml
+│       ├── test-rdma-client.yaml
+│       ├── server-run.sh
+│       ├── client-run.sh
+│       ├── message.h
+│       ├── metric_api.c
+│       ├── metric_api.h
+│       ├── prometheus.c
+│       ├── prometheus.h
+│       ├── server.c
+│       └── client.c
 │
 └── README.md
 ```
