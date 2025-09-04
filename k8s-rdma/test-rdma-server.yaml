@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-rdma-server
+  labels:
+    app: test-rdma-server
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [{"name": "roce-net1", "namespace": "nad", "ips": ["192.168.100.160/24"]}]
+spec:
+  containers:
+    - name: test-rdma-server
+      image: 216yoon/test-rdma:v0.9.5-3.46
+      imagePullPolicy: IfNotPresent
+      ports:
+        - name: metrics
+          containerPort: 9123
+      resources:
+        requests:
+          rdma/hca_shared_devices_a: 1
+        limits:
+          rdma/hca_shared_devices_a: 1

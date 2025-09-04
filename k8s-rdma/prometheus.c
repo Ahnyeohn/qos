@@ -1,4 +1,5 @@
-#include "metrics_store.h"
+#include "prometheus.h"
+/*-------------------------------------------------------------------------*/
 #include <pthread.h>
 #include <string.h>
 #include <stdio.h>
@@ -7,40 +8,23 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 /*-------------------------------------------------------------------------*/
-typedef struct 
-{
-	int valid;
-	app_info ai;
-	node_info ni;
-	lb_signal ls;
-	perf_info pi;
-} rec_t;
-/*-------------------------------------------------------------------------*/
-static rec_t *g_rec = NULL;
+static metrics_t g_metric;
 static int g_slots = 0;
 static pthread_mutex_t g_mu = PTHREAD_MUTEX_INITIALIZER;
 /*-------------------------------------------------------------------------*/
 void metrics_store_init(int slots)
 {
 	pthread_mutex_lock(&g_mu);
-	g_slots = slots;
-	g_rec = (rec_t *)calloc(slots, sizeof(rec_t));
-	pthread_mutex_unlock(&g_mu);
+	g_slots = (slots > 0) ? slots : 1;
+    pthread_mutex_unlock(&g_mu);
 }
 /*-------------------------------------------------------------------------*/
-void metrics_store_update(int slots, const app_info *ai, const node_info *ni, const lb_signal *ls, const perf_info *pi)
-{
-	if (!g_rec || slots < 0 || slots >= g_slots) return;
+void metrics_store_update(metrics_t *out) {
 	pthread_mutex_lock(&g_mu);
-	if (ai) memcpy(&g_rec[slots].ai, ai, sizeof(*ai));
-	if (ni) memcpy(&g_rec[slots].ni, ni, sizeof(*ni));
-	if (ls) memcpy(&g_rec[slots].ls, ls, sizeof(*ls));
-	if (pi) memcpy(&g_rec[slots].pi, pi, sizeof(*pi));
-	g_rec[slots].valid = 1;
+	g_metric = *out;
 	pthread_mutex_unlock(&g_mu);
 }
 /*-------------------------------------------------------------------------*/
-// Prometheus text exposition format으로 serialization
 size_t metrics_store_render(char *out, size_t cap)
 {
 	size_t n = 0;
@@ -75,11 +59,10 @@ size_t metrics_store_render(char *out, size_t cap)
     EMIT("# TYPE perf_fps gauge\n");
 
     for (int i = 0; i < g_slots; i++) {
-        if (!g_rec[i].valid) continue;
-        const app_info  *ai = &g_rec[i].ai;
-        const node_info *ni = &g_rec[i].ni;
-        const lb_signal *ls = &g_rec[i].ls;
-        const perf_info *pi = &g_rec[i].pi;
+        const app_info  *ai = &g_metric.ai;
+        const node_info *ni = &g_metric.ni;
+        const lb_signal *ls = &g_metric.ls;
+        const perf_info *pi = &g_metric.pi;
 
         /* 공통 라벨: queue, app_id, node_id, pod_number, gpu_id */
         /* 정수 라벨은 문자열로 넣어도 무방 */
@@ -103,7 +86,6 @@ size_t metrics_store_render(char *out, size_t cap)
     #undef EMIT
 }
 /*-------------------------------------------------------------------------*/
-/* 아주 단순한 HTTP 서버: GET /metrics 만 응답 */
 void* metrics_http_server(void *arg)
 {
     int port = arg ? *(int*)arg : 9123;
@@ -125,7 +107,7 @@ void* metrics_http_server(void *arg)
     if (listen(srv, 16) < 0) {
         perror("listen"); close(srv); return NULL;
     }
-    printf("[metrics] listening on :%d (/metrics)\n", port);
+    printf("[metrics] listening on :%d (/gpu_metrics)\n", port);
 
     for (;;) {
         int cli = accept(srv, NULL, NULL);
@@ -139,18 +121,20 @@ void* metrics_http_server(void *arg)
 		char method[8] = {0}, path[256] = {0};
 		if (sscanf(req, "%7s %255s", method, path) != 2) {
 			const char *bad = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n";
-			write(cli, bad, strlen(bad));
+			ssize_t n = write(cli, bad, strlen(bad));
+			if (n < 0) perror("write");
 			close(cli);
 			continue;
 		}
 
 		int is_get = (strcmp(method, "GET") == 0);
-		int is_head = (strcmp(method, "HEAD") == 0);
+//		int is_head = (strcmp(method, "HEAD") == 0);
 
 		int path_ok = (!strcmp(path, "/gpu_metrics"));
 		if (!path_ok) {
 			const char *nf = "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n";
-			write(cli, nf, strlen(nf));
+			ssize_t n = write(cli, nf, strlen(nf));
+			if (n < 0) perror("write");
 			close(cli);
 			continue;
 		}
@@ -167,8 +151,12 @@ void* metrics_http_server(void *arg)
             "Content-Length: %zu\r\n"
             "Connection: close\r\n\r\n", blen);
 
-        (void)write(cli, header, hlen);
-        (void)write(cli, body, blen);
+		ssize_t n = write(cli, header, hlen);
+		if (n < 0) perror("write");
+		if (is_get) {
+			ssize_t n = write(cli, body, blen);
+			if (n < 0) perror("write");
+		}
 
         free(body);
         close(cli);

@@ -2,10 +2,10 @@ CC = gcc
 CFLAGS = -O2 -Wall -Wextra -pthread
 LDFLAGS = -lrdmacm -libverbs -pthread
 
-INC = -I./inc
+INC = -I.
 
-SERVER_SRCS = src/server.c src/metric_api.c src/prometheus.c
-CLIENT_SRCS = src/client.c src/metric_api.c
+SERVER_SRCS = server.c metric_api.c prometheus.c
+CLIENT_SRCS = client.c metric_api.c
 SERVER_OBJS = $(SERVER_SRCS:.c=.o)
 CLIENT_OBJS = $(CLIENT_SRCS:.c=.o)
 
@@ -21,4 +21,4 @@ rdma_client: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
 clean:
-	rm -f rdma_server rdma_client src/*.o
+	rm -f rdma_server rdma_client *.o

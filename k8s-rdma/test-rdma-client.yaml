@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-rdma-client
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: test-rdma-client
+  template:
+    metadata:
+      labels:
+        app: test-rdma-client
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |
+          [{ "name": "roce-net2", "namespace": "nad", "interface": "net1" }]
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hpe2
+
+      containers:
+      - name: test-rdma-client
+        image: 216yoon/test-rdma:v0.9.5-3.46
+        imagePullPolicy: IfNotPresent
+
+        command: ["/bin/bash", "-lc"]
+        args:
+          - |
+            for i in $(seq 1 30); do
+              CLIENT_IP=$(ip -o -4 addr show dev net1 | awk '{print $4}' | cut -d/ -f1)
+              [ -n "$CLIENT_IP" ] && break
+              sleep 1
+            done
+            echo "Client IP: $CLIENT_IP"
+            tail -f /dev/null
+
+        resources:
+          requests:
+            rdma/hca_shared_devices_a: 1
+          limits:
+            rdma/hca_shared_devices_a: 1

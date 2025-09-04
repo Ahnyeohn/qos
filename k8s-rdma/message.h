@@ -16,11 +16,6 @@ typedef struct {
     uint32_t input_res_height;		// 4 B
     uint32_t input_framerate;		// 4 B
     uint32_t input_codec;			// 4 B
-
-//	uint32_t input_res_width;		// 4 B
-//	uint32_t input_res_height;		// 4 B
-//	uint32_t input_framerate;		// 4 B
-//	uint32_t input_codec;			// 4 B
 } app_feat;
 /*-------------------------------------------------------------------------*/
 // app_info
@@ -60,4 +55,14 @@ typedef struct {
     float avg_latency;     
     uint32_t FPS;     
 } perf_info;
+/*-------------------------------------------------------------------------*/
+typedef struct {
+	qos_requirement qr;
+	app_feat af;
+	app_info ai;
+	gpu_resource gr;
+	node_info ni;
+	lb_signal ls;
+	perf_info pi;
+} metrics_t;
 /*-------------------------------------------------------------------------*/
