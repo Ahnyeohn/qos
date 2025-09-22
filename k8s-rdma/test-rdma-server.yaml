@@ -10,7 +10,7 @@ metadata:
 spec:
   containers:
     - name: test-rdma-server
-      image: 216yoon/test-rdma:v0.9.5-3.46
+      image: 216yoon/test-rdma:v0.9.18-12.49
       imagePullPolicy: IfNotPresent
       ports:
         - name: metrics

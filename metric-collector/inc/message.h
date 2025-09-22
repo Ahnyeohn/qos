@@ -66,3 +66,17 @@ typedef struct {
 	perf_info pi;
 } metrics_t;
 /*-------------------------------------------------------------------------*/
+#pragma pack(push, 1)
+typedef struct {
+    uint32_t magic;      // "MUXL" = 0x4D55584C
+    uint16_t type;       // 1=TEXT, 2=METRICS
+    uint16_t reserved;
+    uint32_t stream_id;  // logical stream/session/tenant id
+    uint32_t len;        // payload length
+} mux_hdr_t;
+#pragma pack(pop)
+
+#define MUX_MAGIC   0x4D55584Cu
+#define MSG_TEXT    1
+#define MSG_METRICS 2
+/*-------------------------------------------------------------------------*/

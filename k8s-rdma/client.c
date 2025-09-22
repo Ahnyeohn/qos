@@ -12,36 +12,30 @@
 #include <arpa/inet.h>
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
-
-#include "metric_api.h"
-#include "message.h"
-
-#define MSG_SIZE       4096
-#define MAX_SEND_WR    128
-#define MAX_RECV_WR    1
-#define MAX_SGE        1
-	
-metrics_t m;
-
-static volatile sig_atomic_t g_stop = 0;
-static void on_sigint(int signo) { (void)signo; g_stop = 1; }
-
-static void die(const char *msg) {
-    perror(msg);
-    exit(EXIT_FAILURE);
-}
-
+/*-------------------------------------------------------------------------*/
+#include "metric_api.h"   // metric_collect(metrics_t*)
+#include "message.h"      // metrics_t, mux_hdr_t, MUX_MAGIC, MSG_METRICS 등
+/*-------------------------------------------------------------------------*/
+#define MSG_SIZE    4096
+#define MAX_SEND_WR 128
+#define MAX_RECV_WR 1
+#define MAX_SGE     1
+/*-------------------------------------------------------------------------*/
 struct cli_ctx {
     struct rdma_cm_id *id;
     struct ibv_pd *pd;
     struct ibv_comp_channel *comp_ch;
     struct ibv_cq *cq;
     struct ibv_qp *qp;
-
     uint8_t *send_buf;
     struct ibv_mr *send_mr;
 };
+/*-------------------------------------------------------------------------*/
+static volatile sig_atomic_t g_stop = 0;
+static void on_sigint(int signo) { (void)signo; g_stop = 1; }
 
+static void die(const char *msg) { perror(msg); exit(EXIT_FAILURE); }
+/*-------------------------------------------------------------------------*/
 static void wait_event(struct rdma_event_channel *ec, enum rdma_cm_event_type expect) {
     struct rdma_cm_event *event = NULL;
     if (rdma_get_cm_event(ec, &event)) die("rdma_get_cm_event");
@@ -52,48 +46,59 @@ static void wait_event(struct rdma_event_channel *ec, enum rdma_cm_event_type ex
         exit(EXIT_FAILURE);
     }
 }
+/*-------------------------------------------------------------------------*/
+/* 멀티플렉싱 헤더 붙여 전송 */
+static int send_mux(struct cli_ctx *c, uint16_t type, uint32_t sid,
+                    const void *payload, uint32_t plen)
+{
+    mux_hdr_t h = {
+        .magic     = htonl(MUX_MAGIC),
+        .type      = htons(type),
+        .reserved  = 0,
+        .stream_id = htonl(sid),
+        .len       = htonl(plen),
+    };
+    if (sizeof(h) + plen > MSG_SIZE) {
+        errno = EMSGSIZE;
+        return -1;
+    }
 
-static int post_send_line(struct cli_ctx *c) {
-	metric_collect(&m);
-    size_t len = sizeof(m);
-	memcpy(c->send_buf, &m, len);
+    memcpy(c->send_buf, &h, sizeof(h));
+    memcpy(c->send_buf + sizeof(h), payload, plen);
 
     struct ibv_sge sge = {
-        .addr = (uintptr_t)c->send_buf,
-        .length = (uint32_t)len,
-        .lkey = c->send_mr->lkey,
+        .addr   = (uintptr_t)c->send_buf,
+        .length = (uint32_t)(sizeof(h) + plen),
+        .lkey   = c->send_mr->lkey,
     };
-
     struct ibv_send_wr wr = {0}, *bad = NULL;
-    wr.wr_id = 1;
-    wr.sg_list = &sge;
-    wr.num_sge = 1;
-    wr.opcode = IBV_WR_SEND;
-    wr.send_flags = IBV_SEND_SIGNALED; // 완료 이벤트 요청
+    wr.sg_list   = &sge;
+    wr.num_sge   = 1;
+    wr.opcode    = IBV_WR_SEND;
+    wr.send_flags = IBV_SEND_SIGNALED;
 
     return ibv_post_send(c->qp, &wr, &bad);
 }
-
+/*-------------------------------------------------------------------------*/
 static void wait_for_send_comp(struct cli_ctx *c) {
     if (ibv_req_notify_cq(c->cq, 0)) die("ibv_req_notify_cq");
 
-    struct ibv_cq *ev_cq = NULL;
-    void *ev_ctx = NULL;
+    struct ibv_cq *ev_cq = NULL; void *ev_ctx = NULL;
     if (ibv_get_cq_event(c->comp_ch, &ev_cq, &ev_ctx)) die("ibv_get_cq_event");
     ibv_ack_cq_events(ev_cq, 1);
 
     struct ibv_wc wc;
     int n;
-    while ((n = ibv_poll_cq(c->cq, 1, &wc)) == 0) { /*spin*/ }
+    while ((n = ibv_poll_cq(c->cq, 1, &wc)) == 0) { /* spin */ }
     if (n < 0) die("ibv_poll_cq");
     if (wc.status != IBV_WC_SUCCESS || wc.opcode != IBV_WC_SEND) {
         fprintf(stderr, "[CLIENT] send WC error: status=%d opcode=%d\n", wc.status, wc.opcode);
         exit(EXIT_FAILURE);
     }
 }
-
+/*-------------------------------------------------------------------------*/
 int main(int argc, char **argv) {
-	srand(time(NULL));
+    srand((unsigned)time(NULL));
 
     const char *server_ip = NULL;
     uint16_t port = 7471;
@@ -123,7 +128,7 @@ int main(int argc, char **argv) {
 
     struct sockaddr_in dst = {0};
     dst.sin_family = AF_INET;
-    dst.sin_port = htons(port);
+    dst.sin_port   = htons(port);
     if (inet_pton(AF_INET, server_ip, &dst.sin_addr) != 1) die("inet_pton");
 
     if (rdma_resolve_addr(id, NULL, (struct sockaddr *)&dst, 2000)) die("rdma_resolve_addr");
@@ -132,9 +137,10 @@ int main(int argc, char **argv) {
     if (rdma_resolve_route(id, 2000)) die("rdma_resolve_route");
     wait_event(ec, RDMA_CM_EVENT_ROUTE_RESOLVED);
 
-    // 리소스 구성
+    /* 리소스 구성 */
     struct cli_ctx c = {0};
     c.id = id;
+
     c.pd = ibv_alloc_pd(id->verbs);
     if (!c.pd) die("ibv_alloc_pd");
 
@@ -145,12 +151,12 @@ int main(int argc, char **argv) {
     if (!c.cq) die("ibv_create_cq");
 
     struct ibv_qp_init_attr qp_attr = {0};
-    qp_attr.qp_type = IBV_QPT_RC;
-    qp_attr.sq_sig_all = 1;
-    qp_attr.send_cq = c.cq;
-    qp_attr.recv_cq = c.cq;
-    qp_attr.cap.max_send_wr = MAX_SEND_WR;
-    qp_attr.cap.max_recv_wr = MAX_RECV_WR;
+    qp_attr.qp_type        = IBV_QPT_RC;
+    qp_attr.sq_sig_all     = 1;
+    qp_attr.send_cq        = c.cq;
+    qp_attr.recv_cq        = c.cq;
+    qp_attr.cap.max_send_wr  = MAX_SEND_WR;
+    qp_attr.cap.max_recv_wr  = MAX_RECV_WR;
     qp_attr.cap.max_send_sge = MAX_SGE;
     qp_attr.cap.max_recv_sge = MAX_SGE;
 
@@ -163,22 +169,36 @@ int main(int argc, char **argv) {
     if (!c.send_mr) die("ibv_reg_mr");
 
     struct rdma_conn_param cp = {0};
-    cp.initiator_depth = 1;
+    cp.initiator_depth     = 1;
     cp.responder_resources = 1;
-    cp.rnr_retry_count = 7; // infinite retry
+    cp.rnr_retry_count     = 7; // infinite retry
 
     if (rdma_connect(id, &cp)) die("rdma_connect");
     wait_event(ec, RDMA_CM_EVENT_ESTABLISHED);
 
+    /* 주기적으로 메트릭 수집 후 MUX 헤더와 함께 전송 */
     while (!g_stop) {
-        if (post_send_line(&c)) die("ibv_post_send");
+        metrics_t m;
+        metric_collect(&m);  // 랜덤/실측 값 채움 (네가 정의한 함수)
+
+        if (send_mux(&c, MSG_METRICS, /*stream_id*/ 1, &m, sizeof(m)) != 0) {
+            die("send_mux");
+        }
         wait_for_send_comp(&c);
+
+        /* 너무 빡세지 않게 텀을 둠 (원하는 주기로 바꿔도 됨) */
+//		usleep(200 * 1000); // 200 ms
+		struct timespec ts = {
+			.tv_sec = 0,
+			.tv_nsec = 200 * 1000 * 1000L
+		};
+		nanosleep(&ts, NULL);
     }
 
     rdma_disconnect(id);
     wait_event(ec, RDMA_CM_EVENT_DISCONNECTED);
 
-    // 정리
+    /* 정리 */
     if (c.qp) rdma_destroy_qp(id);
     if (c.cq) ibv_destroy_cq(c.cq);
     if (c.comp_ch) ibv_destroy_comp_channel(c.comp_ch);
