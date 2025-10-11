@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gpu-metrics
+  namespace: monitoring
+  labels:
+    release: prometheus 
+spec:
+  selector:
+    matchLabels:
+      app: test-rdma-server
+  namespaceSelector:
+    matchNames: ["monitoring"]
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 5s
+      path: /gpu_metrics
+      scheme: http
+      honorLabels: false

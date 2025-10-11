@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-metrics-server
+  namespace: monitoring
+  labels:
+    app: gpu-metrics-server
+spec:
+  selector:
+    app: test-rdma-server
+  ports:
+    - name: metrics
+      port: 9123
+      targetPort: 9123

@@ -305,7 +305,8 @@ int main(int argc, char **argv)
     /* Prometheus exporter: start once */
     static pthread_t metrics_thr;
     static int metrics_port = 9123;
-    metrics_store_init(BACKLOG);
+//	metrics_store_init(BACKLOG);
+    metrics_store_init(1);
     if (pthread_create(&metrics_thr, NULL, metrics_http_server, &metrics_port)) {
         perror("pthread_create(metrics_http_server)");
     }
