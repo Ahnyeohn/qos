@@ -7,3 +7,6 @@
 [submodule "network/mediasoup-demo"]
 	path = network/mediasoup-demo
 	url = https://github.com/Ahnyeohn/mediasoup-demo.git
+[submodule "network/mediasoup"]
+	path = network/mediasoup
+	url = https://github.com/Ahnyeohn/mediasoup.git
