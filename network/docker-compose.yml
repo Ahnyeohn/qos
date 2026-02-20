@@ -1,7 +1,8 @@
 services:
   mediasoup-server:
     network_mode: "host"
-    image: anyeon07/mediasoup-server-edge:v1
+    #image: anyeon07/mediasoup-server-origin:v1
+    image: ghcr.io/ahnyeohn/mediasoup-server-origin:v1
     build:
       context: . #./mediasoup-demo/server/
       dockerfile: mediasoup-demo/server/Dockerfile
@@ -51,7 +52,8 @@ services:
     restart: unless-stopped
 
   mediasoup-app:
-    image: anyeon07/mediasoup-app-edge:v1
+    #image: anyeon07/mediasoup-app-origin:v1
+    image: ghcr.io/ahnyeohn/mediasoup-app-origin:v1
     build:
       context: . #./mediasoup-demo/app
       dockerfile: mediasoup-demo/app/Dockerfile
