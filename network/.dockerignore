@@ -78,6 +78,7 @@ mediasoup-demo/server/mediasoup-demo-terminal.sock
 mediasoup-demo/server/public
 
 # Locally generated stuff.
+mediasoup-demo/server/certs
 mediasoup-demo/server/*.tgz
 mediasoup-demo/server/.vscode
 mediasoup-demo/server/.zed

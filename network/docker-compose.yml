@@ -13,7 +13,6 @@ services:
     #   - seccomp=unconfined
     security_opt:
       - seccomp=mediasoup-demo/server/seccomp/allow-io-uring.json
-      
     environment:
       - NODE_ENV=production
       - DEBUG=mediasoup*
