@@ -1,0 +1,2 @@
+model,mae,rmse,r2,total_valid_rows,test_rows,test_ratio
+ExistingCsvPredictedSlack,37.87490030958722,45.73247323394437,-0.23032645793647988,10012,3004,0.3

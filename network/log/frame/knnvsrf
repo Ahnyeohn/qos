@@ -1,0 +1,139 @@
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# ===== 고정 경로 =====
+KNN_SUMMARY_CSV = "/home/n2sl/yeon/qos/network/log/frame/knn_result/existing_csv_prediction_summary.csv"
+RF_SUMMARY_CSV = "/home/n2sl/yeon/qos/network/log/frame/rf_results/rf_slack_prediction_summary.csv"
+OUT_DIR = "/home/n2sl/yeon/qos/network/log/frame/model_compare"
+
+
+def load_summary(csv_path: str) -> pd.DataFrame:
+    df = pd.read_csv(csv_path)
+    if df.empty:
+        raise ValueError(f"Empty summary CSV: {csv_path}")
+    return df
+
+
+def build_compare_df(knn_df: pd.DataFrame, rf_df: pd.DataFrame) -> pd.DataFrame:
+    knn_row = knn_df.iloc[0]
+    rf_row = rf_df.iloc[0]
+
+    compare_df = pd.DataFrame({
+        "metric": ["MAE", "RMSE", "R2"],
+        "k-NN": [
+            float(knn_row["mae"]),
+            float(knn_row["rmse"]),
+            float(knn_row["r2"]),
+        ],
+        "RandomForest": [
+            float(rf_row["mae"]),
+            float(rf_row["rmse"]),
+            float(rf_row["r2"]),
+        ]
+    })
+
+    return compare_df
+
+
+def add_bar_labels(ax, bars):
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            height,
+            f"{height:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=9
+        )
+
+
+def add_line_labels(ax, xs, ys):
+    for x, y in zip(xs, ys):
+        ax.text(
+            x,
+            y,
+            f"{y:.3f}",
+            ha="center",
+            va="bottom" if y >= 0 else "top",
+            fontsize=9
+        )
+
+
+def plot_combined(compare_df: pd.DataFrame, out_path: str):
+    # MAE, RMSE는 막대그래프
+    bar_df = compare_df[compare_df["metric"].isin(["MAE", "RMSE"])].reset_index(drop=True)
+    # R2는 선그래프
+    r2_df = compare_df[compare_df["metric"] == "R2"].reset_index(drop=True)
+
+    x = np.arange(len(bar_df))   # MAE, RMSE 위치
+    width = 0.35
+
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # 왼쪽 y축: MAE, RMSE
+    bars1 = ax1.bar(x - width/2, bar_df["k-NN"], width, label="k-NN")
+    bars2 = ax1.bar(x + width/2, bar_df["RandomForest"], width, label="RandomForest")
+
+    ax1.set_xlabel("Metrics")
+    ax1.set_ylabel("MAE / RMSE")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(bar_df["metric"])
+    ax1.grid(True, axis="y", alpha=0.3)
+
+    add_bar_labels(ax1, bars1)
+    add_bar_labels(ax1, bars2)
+
+    # 오른쪽 y축: R2
+    ax2 = ax1.twinx()
+
+    # R2를 오른쪽에 별도 위치에 그림
+    r2_x = np.array([len(bar_df) + 0.5])  # MAE, RMSE 오른쪽에 따로 배치
+    ax2.plot(r2_x, r2_df["k-NN"], marker="o", linewidth=2, label="k-NN R2")
+    ax2.plot(r2_x, r2_df["RandomForest"], marker="o", linewidth=2, label="RF R2")
+
+    ax2.set_ylabel("R2")
+    ax2.set_xticks(list(x) + list(r2_x))
+    ax1.set_xticks(list(x) + list(r2_x))
+    ax1.set_xticklabels(["MAE", "RMSE", "R2"])
+
+    add_line_labels(ax2, r2_x, r2_df["k-NN"].values)
+    add_line_labels(ax2, r2_x, r2_df["RandomForest"].values)
+
+    # 범례 합치기
+    handles1, labels1 = ax1.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(handles1 + handles2, labels1 + labels2, loc="best")
+
+    plt.title("k-NN vs RandomForest Comparison")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
+
+    print(f"[INFO] Saved: {out_path}")
+
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    knn_df = load_summary(KNN_SUMMARY_CSV)
+    rf_df = load_summary(RF_SUMMARY_CSV)
+
+    compare_df = build_compare_df(knn_df, rf_df)
+
+    print("[INFO] Comparison data:")
+    print(compare_df)
+
+    compare_csv_path = os.path.join(OUT_DIR, "knn_rf_metric_comparison.csv")
+    compare_df.to_csv(compare_csv_path, index=False)
+    print(f"[INFO] Saved: {compare_csv_path}")
+
+    plot_path = os.path.join(OUT_DIR, "knn_vs_rf_combined.png")
+    plot_combined(compare_df, plot_path)
+
+
+if __name__ == "__main__":
+    main()
