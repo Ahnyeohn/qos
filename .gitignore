@@ -1,1 +1,4 @@
-network/log/
+network/log/**/*.csv
+network/log/**/*.png
+network/log/**/*.txt
+network/log/**/*.log
