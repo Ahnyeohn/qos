@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mediasoup-edge-3
+  namespace: qos
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 10.20.13.224
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    statefulset.kubernetes.io/pod-name: mediasoup-edge-3
+  ports:
+  - name: signaling
+    port: 4443
+    targetPort: 4443
+    protocol: TCP
+  - name: pipeapi
+    port: 4445
+    targetPort: 4445
+    protocol: TCP
+  - name: web
+    port: 5555
+    targetPort: 5555
+    protocol: TCP
+  - name: webrtc-udp
+    port: 44444
+    targetPort: 44444
+    protocol: UDP
+  - name: webrtc-tcp
+    port: 44444
+    targetPort: 44444
+    protocol: TCP

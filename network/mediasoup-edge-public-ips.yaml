@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mediasoup-edge-public-ips
+  namespace: qos
+data:
+  mediasoup-edge-0: "10.20.13.220"
+  mediasoup-edge-1: "10.20.13.222"
+  mediasoup-edge-2: "10.20.13.223"
+  mediasoup-edge-3: "10.20.13.224"
+  mediasoup-edge-4: "10.20.13.225"
+  mediasoup-edge-5: "10.20.13.227"
+  mediasoup-edge-6: "10.20.13.228"
+  mediasoup-edge-7: "10.20.13.229"
+  mediasoup-edge-8: "10.20.13.231"
+  mediasoup-edge-9: "10.20.13.235"
+  mediasoup-edge-10: "10.20.13.237"
+  mediasoup-edge-11: "10.20.13.239"

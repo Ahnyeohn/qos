@@ -1,0 +1,28 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: edge-public-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 10.20.13.220/32
+  - 10.20.13.222/32
+  - 10.20.13.223/32
+  - 10.20.13.224/32
+  - 10.20.13.225/32
+  - 10.20.13.227/32
+  - 10.20.13.228/32
+  - 10.20.13.229/32
+  - 10.20.13.231/32
+  - 10.20.13.235/32
+  - 10.20.13.237/32
+  - 10.20.13.239/32
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: edge-public-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - edge-public-pool

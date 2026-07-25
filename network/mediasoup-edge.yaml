@@ -1,11 +1,13 @@
 apiVersion: apps/v1
-kind: Deployment
+# kind: Deployment
+kind: StatefulSet
 metadata:
   name: mediasoup-edge
+  namespace: qos
   labels:
     app: mediasoup-edge
-  namespace: qos
 spec:
+  serviceName: mediasoup-edge-headless
   replicas: 2
   selector:
     matchLabels:
@@ -16,20 +18,34 @@ spec:
         app: mediasoup-edge
     spec:
       ## 노드에서 레플리카를 2개 이상으로 늘리려면 호스트 네트워크 맟 아래 dnspolicy는 주석 처리해야 함
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # hostNetwork: true
+      # dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
+
       
       nodeSelector:
         role: edge
       
       ## 임시 설정: hostnetwork 모드에서 각 노드당 레플리카를 배포하기 위한 임시 설정임
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app: mediasoup-edge
-            topologyKey: kubernetes.io/hostname
+      # affinity:
+      #   podAntiAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #     - labelSelector:
+      #         matchLabels:
+      #           app: mediasoup-edge
+      #       topologyKey: kubernetes.io/hostname
+
+      # 기본은 노드마다 최대한 분산,
+      # replica가 노드 수보다 많아지면 같은 노드에도 배치 허용
+      # 이거랑 위 둘 중에 하나만 사용해야 함
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: mediasoup-edge
+
 
       # private GHCR이면 주석 해제
       imagePullSecrets:
@@ -45,18 +61,25 @@ spec:
         hostPath:
           path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
           type: Directory
+      - name: edge-public-ips
+        configMap:
+          name: mediasoup-edge-public-ips
+      - name: mediasoup-edge-config
+        configMap:
+          name: mediasoup-edge-config
 
       containers:
       - name: mediasoup-server
         image: ghcr.io/ahnyeohn/mediasoup-server-edge:v1
-        imagePullPolicy: Always
+        # imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
             requests:
-              cpu: 200m
-              memory: 100Mi
+              cpu: 500m
+              memory: 512Mi
             limits:
-              cpu: 400m
-              memory: 200Mi
+              cpu: "4"
+              memory: 2Gi
         env:
         - name: NODE_ENV
           value: "production"
@@ -65,7 +88,19 @@ spec:
         - name: SERVER_IP
           valueFrom:
             fieldRef:
-              fieldPath: status.hostIP
+              # fieldPath: status.hostIP
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MEDIASOUP_NUM_WORKERS
+          value: "1"
+        ## PUBLIC_IP는 직접 env로 넣지 않고, ConfigMap 파일에서 읽어서 export
         ports:
         - name: signaling
           containerPort: 4443
@@ -73,10 +108,42 @@ spec:
         - name: pipeapi
           containerPort: 4445
           protocol: TCP
+        - name: webrtc-udp
+          containerPort: 44444
+          protocol: UDP
+        - name: webrtc-tcp
+          containerPort: 44444
+          protocol: TCP
         volumeMounts:
         - name: certs
           mountPath: /work/mediasoup-demo/server/certs
           readOnly: true
+        - name: edge-public-ips
+          mountPath: /etc/edge-public-ips
+          readOnly: true
+        ## 임시용: 이미지를 빌드하는 것이 번거로워서 일단 public ip를 config에 반영하기 위해 임시로 설정파일을 마운트(외부 접속용)
+        - name: mediasoup-edge-config
+          mountPath: /work/mediasoup-demo/server/config.mjs
+          subPath: config.mjs
+          readOnly: true
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          export PUBLIC_IP="$(cat /etc/edge-public-ips/${POD_NAME})"
+          echo "POD_NAME=${POD_NAME}"
+          echo "SERVER_IP=${SERVER_IP}"
+          echo "PUBLIC_IP=${PUBLIC_IP}"
+
+          if [ -z "${PUBLIC_IP}" ]; then
+            echo "ERROR: PUBLIC_IP is empty for POD_NAME=${POD_NAME}"
+            exit 1
+          fi
+
+          exec npm start
+        
+        ## SERVER_IP는 클러스터 내부 즉, origin과 edge간 통신할때 사용
+        ## PUBLIC_IP는 외부에서 접근할 때 즉, 클라이언트에서 접속할때 사용
+        # 그래서 origin의 엣지 리스트는 server ip를 사용한다.
 
       - name: mediasoup-app
         image: ghcr.io/ahnyeohn/mediasoup-app-edge:v1

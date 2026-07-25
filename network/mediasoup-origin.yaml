@@ -23,6 +23,7 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
 
+      #kubectl label node n2sl role=origin로 라벨링을 해야 함
       nodeSelector:
         role: origin
       tolerations:
@@ -43,6 +44,10 @@ spec:
         hostPath:
           path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
           type: Directory
+      ## origin의 expipe 위한 외부 ip url 세팅 (이미지 빌드 없이) 
+      - name: mediasoup-origin-room-ts
+        configMap:
+          name: mediasoup-origin-room-ts
         # secret:
         #   secretName: mediasoup-certs
 
@@ -52,11 +57,11 @@ spec:
         imagePullPolicy: Always
         resources:
             requests:
-              cpu: 200m
-              memory: 100Mi
+              cpu: 500m
+              memory: 512Mi
             limits:
-              cpu: 400m
-              memory: 200Mi
+              cpu: "4"
+              memory: 2Gi
         env:
         - name: NODE_ENV
           value: "production"
@@ -76,6 +81,10 @@ spec:
         volumeMounts:
         - name: certs
           mountPath: /work/mediasoup-demo/server/certs
+          readOnly: true
+        - name: mediasoup-origin-room-ts
+          mountPath: /work/mediasoup-demo/server/src/Room.origin.ts
+          subPath: Room.origin.ts
           readOnly: true
 
       - name: mediasoup-app

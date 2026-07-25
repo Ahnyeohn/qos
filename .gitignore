@@ -1,0 +1,5 @@
+network/log/**/*.csv
+network/log/**/*.png
+network/log/**/*.txt
+network/log/**/*.log
+network/log/**/*.pcapng
