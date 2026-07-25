@@ -97,6 +97,16 @@ def load_and_prepare_csv(csv_path: str, late_threshold_ms: float) -> pd.DataFram
 
         "currentSpatialLayer",
         "availableBitrateBps",
+        "gccAvailableBitrateBps",
+        "camelAvailableBitrateBps",
+
+        # pacing / ACE metrics
+        "aceQueueBytes",
+        "pacingBacklogBytes",
+        "pacingBucketSizeBytes",
+        "camelBurstLengthBytes",
+
+        "lossRate",
 
         # 3-class 분류용
         "decodeStartMs",
@@ -171,6 +181,8 @@ def load_and_prepare_csv(csv_path: str, late_threshold_ms: float) -> pd.DataFram
 
     # bitrate
     df["availableBitrateMbps"] = df["availableBitrateBps"] / 1_000_000.0
+    df["gccAvailableBitrateMbps"] = df["gccAvailableBitrateBps"] / 1_000_000.0
+    df["camelAvailableBitrateMbps"] = df["camelAvailableBitrateBps"] / 1_000_000.0
 
     # 3-class 분류
     df["isDropped"] = classify_dropped_frame(df)
@@ -259,6 +271,15 @@ def print_summary(df: pd.DataFrame) -> None:
         print(f"\n[{cls}]")
         print(df.loc[df["frameClass"] == cls, "renderMinusReceiveMs"].describe())
 
+    print("\n[INFO] ACE / pacing metrics summary:")
+    pacing_metric_cols = [
+        "aceQueueBytes",
+        "pacingBacklogBytes",
+        "pacingBucketSizeBytes",
+        "camelBurstLengthBytes",
+    ]
+    print(df[pacing_metric_cols].describe())
+
 
 def plot_metrics(
     df: pd.DataFrame,
@@ -272,15 +293,17 @@ def plot_metrics(
         ax_nominal,
         ax_predecode,
         ax_layer,
+        ax_pacing_metrics,
+        ax_loss,
         ax_queue,
         ax_residence,
     ) = plt.subplots(
-        6,
+        8,
         1,
-        figsize=(16, 16),
+        figsize=(16, 19),
         sharex=True,
         gridspec_kw={
-            "height_ratios": [2.2, 2.2, 1.8, 1.2, 1.8, 1.8]
+            "height_ratios": [2.2, 2.2, 1.8, 1.2, 1.8, 1.2, 1.8, 1.8]
         },
     )
 
@@ -395,12 +418,20 @@ def plot_metrics(
     ax_bitrate = ax_layer.twinx()
     ax_bitrate.plot(
         x,
-        df["availableBitrateMbps"],
-        label="availableBitrateMbps",
-        linewidth=1.5,
-        alpha=0.8,
-        linestyle="-",
-        color="blue",
+        df["gccAvailableBitrateMbps"],
+        label="GCC bitrate",
+        linewidth=1.8,
+        alpha=0.9,
+        linestyle="--",
+    )
+
+    ax_bitrate.plot(
+        x,
+        df["camelAvailableBitrateMbps"],
+        label="Camel bitrate",
+        linewidth=1.8,
+        alpha=0.9,
+        linestyle=":",
     )
     ax_bitrate.set_ylabel("Available Bitrate (Mbps)")
 
@@ -409,8 +440,77 @@ def plot_metrics(
     ax_layer.legend(lines1 + lines2, labels1 + labels2, loc="best")
     ax_layer.set_title("Spatial Layer and Available Bitrate")
 
+    ## ax_bitrate.set_yscale("log")
     # ============================================================
-    # 5. queueResidenceMs
+    # 5. ACE / pacing / Camel burst metrics
+    #    aceQueueBytes / pacingBacklogBytes / pacingBucketSizeBytes /
+    #    camelBurstLengthBytes를 같은 칸에 함께 표시
+    # ============================================================
+    # ax_pacing_metrics.plot(
+    #     x,
+    #     df["aceQueueBytes"],
+    #     label="aceQueueBytes",
+    #     linewidth=2.0,
+    #     alpha=0.9,
+    #     linestyle="-",
+    # )
+
+    # ax_pacing_metrics.plot(
+    #     x,
+    #     df["pacingBacklogBytes"],
+    #     label="pacingBacklogBytes",
+    #     linewidth=2.0,
+    #     alpha=0.9,
+    #     linestyle="--",
+    # )
+
+    ax_pacing_metrics.plot(
+        x,
+        df["pacingBucketSizeBytes"],
+        label="pacingBucketSizeBytes",
+        linewidth=2.0,
+        alpha=0.9,
+        linestyle="-.",
+    )
+
+    ax_pacing_metrics.plot(
+        x,
+        df["camelBurstLengthBytes"],
+        label="camelBurstLengthBytes",
+        linewidth=2.0,
+        alpha=0.9,
+        linestyle=":",
+    )
+
+    ax_pacing_metrics.axhline(0, color="black", linewidth=1.0, alpha=0.45)
+    ax_pacing_metrics.set_ylabel("Bytes")
+    ax_pacing_metrics.set_title(
+        "ACE Queue / Pacing Backlog / Pacing Bucket Size / Camel Burst Length"
+    )
+    ax_pacing_metrics.grid(True, alpha=0.3)
+    ax_pacing_metrics.legend(loc="best")
+
+    # ============================================================
+    # 6. lossRate
+    #    기존 방식 그대로
+    #    late/drop 구분 표시 안 함
+    # ============================================================
+    ax_loss.plot(
+        x,
+        df["lossRate"],
+        label="lossRate",
+        linewidth=2.0,
+        alpha=0.9,
+        linestyle="-",
+    )
+
+    ax_loss.axhline(0, color="black", linewidth=1.0, alpha=0.45)
+    ax_loss.set_ylabel("Loss rate")
+    ax_loss.set_title("Packet Loss Rate")
+    ax_loss.grid(True, alpha=0.3)
+    ax_loss.legend(loc="best")
+    # ============================================================
+    # 7. queueResidenceMs
     #    기존 방식 그대로
     #    late/drop 구분 표시 안 함
     # ============================================================
@@ -430,7 +530,7 @@ def plot_metrics(
     ax_queue.legend(loc="best")
 
     # ============================================================
-    # 6. decodeQueueResidenceMs / frameBufferResidenceMs
+    # 8. decodeQueueResidenceMs / frameBufferResidenceMs
     #    기존 방식 그대로
     #    late/drop 구분 표시 안 함
     # ============================================================
@@ -473,6 +573,8 @@ def plot_metrics(
         ax_nominal.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_predecode.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_layer.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
+        ax_pacing_metrics.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
+        ax_loss.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_queue.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_residence.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
 
@@ -504,7 +606,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Plot decode slack, preDecodeWaiting, spatial layer/bitrate, "
-            "queueResidence, nominal slack, and residence metrics. "
+            "ACE/pacing/Camel burst, queueResidence, nominal slack, and residence metrics. "
             "Only late/dropped frames are circled where requested."
         )
     )
@@ -547,17 +649,17 @@ def main():
         csv_path = args.input
     else:
         if args.pacing == 1:
-            csv_path = "/home/n2sl/yeon/qos/network/log/frame/frame_records_pacing.csv"
+            csv_path = "csv/frame_records_pacing.csv"
         else:
-            csv_path = "/home/n2sl/yeon/qos/network/log/frame/frame_records.csv"
+            csv_path = "csv/frame_records.csv"
 
     if args.output is not None:
         out_path = args.output
     else:
         if args.pacing == 1:
-            out_path = "/home/n2sl/yeon/qos/network/log/frame/plots/effective_nominal_predecode_residence_circled_pacing.png"
+            out_path = "plots/effective_nominal_predecode_pacing_camel_metrics_residence_circled_pacing.png"
         else:
-            out_path = "/home/n2sl/yeon/qos/network/log/frame/plots/effective_nominal_predecode_residence_circled.png"
+            out_path = "plots/effective_nominal_predecode_pacing_camel_metrics_residence_circled.png"
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 

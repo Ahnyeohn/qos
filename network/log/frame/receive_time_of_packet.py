@@ -1,3 +1,5 @@
+## RECEIVE TIME OF EACH PACKET
+
 import os
 import argparse
 import numpy as np
@@ -114,8 +116,51 @@ def format_ms(value) -> str:
     except Exception:
         return str(value)
 
+def load_packet_span_by_frame(packet_csv_path: str) -> pd.DataFrame:
+    """
+    frame_records.csv에서 frameId별 packet receiveTime span 계산.
 
-def load_and_classify(csv_path: str, late_threshold_ms: float) -> pd.DataFrame:
+    packet_span = max(receiveTimeMs) - min(receiveTimeMs)
+
+    필요한 컬럼:
+    - frameId
+    - receiveTimeMs
+    """
+    packet_df = pd.read_csv(packet_csv_path, skipinitialspace=True)
+    packet_df.columns = packet_df.columns.str.strip()
+
+    required_cols = ["frameId", "receiveTimeMs"]
+    missing = [c for c in required_cols if c not in packet_df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns in packet CSV: {missing}")
+
+    packet_df["frameId"] = to_numeric_clean(packet_df["frameId"])
+    packet_df["receiveTimeMs"] = to_numeric_clean(packet_df["receiveTimeMs"])
+
+    packet_df = packet_df.dropna(subset=["frameId", "receiveTimeMs"]).copy()
+
+    packet_df = packet_df[packet_df["receiveTimeMs"] > 0].copy()
+
+    span_df = (
+        packet_df
+        .groupby("frameId", as_index=False)
+        .agg(
+            firstPacketReceiveTimeMs=("receiveTimeMs", "min"),
+            lastPacketReceiveTimeMs=("receiveTimeMs", "max"),
+        )
+    )
+
+    span_df["packet_span"] = (
+        span_df["lastPacketReceiveTimeMs"]
+        - span_df["firstPacketReceiveTimeMs"]
+    )
+
+    span_df.loc[span_df["packet_span"] < 0, "packet_span"] = 0.0
+
+    return span_df[["frameId", "packet_span"]]
+
+
+def load_and_classify(csv_path: str, late_threshold_ms: float,  packet_csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path, skipinitialspace=True)
     df.columns = df.columns.str.strip()
 
@@ -149,6 +194,14 @@ def load_and_classify(csv_path: str, late_threshold_ms: float) -> pd.DataFrame:
     df["isDropped"] = classify_dropped_frame(df)
     df["frameClass"] = classify_frame_class(df, late_threshold_ms)
 
+    packet_span_df = load_packet_span_by_frame(packet_csv_path)
+
+    df = df.merge(
+        packet_span_df,
+        on="frameId",
+        how="left",
+    )
+
     df = df.sort_values("frameId").reset_index(drop=True)
 
     return df
@@ -160,12 +213,10 @@ def write_late_drop_txt(
     csv_path: str,
     late_threshold_ms: float,
 ) -> None:
-    output_cols = ["frameId", "max_wait", "preDecodeWaitingMs"]
+    output_cols = ["frameId", "max_wait", "preDecodeWaitingMs", "packet_span"]
 
     late_df = df[df["frameClass"] == CLASS_LATE_NORMAL][output_cols].copy()
     drop_df = df[df["frameClass"] == CLASS_DROPPED][output_cols].copy()
-
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("Frame classification summary\n")
@@ -178,23 +229,25 @@ def write_late_drop_txt(
         f.write("\n")
 
         f.write("[LATE_NORMAL]\n")
-        f.write("frameId,max_wait,preDecodeWaitingMs\n")
+        f.write("frameId,max_wait,preDecodeWaitingMs,packet_span\n")
         for _, row in late_df.iterrows():
             f.write(
                 f"{format_frame_id(row['frameId'])},"
                 f"{format_ms(row['max_wait'])},"
-                f"{format_ms(row['preDecodeWaitingMs'])}\n"
+                f"{format_ms(row['preDecodeWaitingMs'])},"
+                f"{format_ms(row['packet_span'])}\n"
             )
 
         f.write("\n")
 
         f.write("[DROPPED]\n")
-        f.write("frameId,max_wait,preDecodeWaitingMs\n")
+        f.write("frameId,max_wait,preDecodeWaitingMs,packet_span\n")
         for _, row in drop_df.iterrows():
             f.write(
                 f"{format_frame_id(row['frameId'])},"
                 f"{format_ms(row['max_wait'])},"
-                f"{format_ms(row['preDecodeWaitingMs'])}\n"
+                f"{format_ms(row['preDecodeWaitingMs'])},"
+                f"{format_ms(row['packet_span'])}\n"
             )
 
     print(f"[INFO] saved: {out_path}")
@@ -239,6 +292,13 @@ def parse_args():
         help="Optional output txt path",
     )
 
+    parser.add_argument(
+        "--input2",
+        type=str,
+        default=None,
+        help="Packet-level CSV path used to compute packet_span",
+    )
+
     return parser.parse_args()
 
 
@@ -249,17 +309,25 @@ def main():
         csv_path = args.input
     else:
         if args.pacing == 1:
-            csv_path = "/home/n2sl/yeon/qos/network/log/frame/frame_records_pacing.csv"
+            csv_path = "csv/frame_records_pacing.csv"  
         else:
-            csv_path = "/home/n2sl/yeon/qos/network/log/frame/frame_records-1.csv"
+            csv_path = "csv/frame_records.csv"
+    
+    if args.input2 is not None:
+        csv_path2 = args.input2
+    else:
+        if args.pacing == 1:
+            csv_path2 = "csv/frame_packets.csv"
+        else:
+            csv_path2 = "csv/frame_packets.csv"
 
     if args.output is not None:
         out_path = args.output
     else:
         if args.pacing == 1:
-            out_path = "/home/n2sl/yeon/qos/network/log/frame/late_drop_frames_pacing.txt"
+            out_path = "txt/late_drop_frames_pacing.txt"
         else:
-            out_path = "/home/n2sl/yeon/qos/network/log/frame/late_drop_frames.txt"
+            out_path = "txt/late_drop_frames.txt"
 
     print(f"[INFO] csv_path          : {csv_path}")
     print(f"[INFO] out_path          : {out_path}")
@@ -268,6 +336,7 @@ def main():
     df = load_and_classify(
         csv_path=csv_path,
         late_threshold_ms=args.late_threshold_ms,
+        packet_csv_path=csv_path2,
     )
 
     write_late_drop_txt(
