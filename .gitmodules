@@ -10,3 +10,7 @@
 [submodule "network/mediasoup"]
 	path = network/mediasoup
 	url = https://github.com/Ahnyeohn/mediasoup.git
+[submodule "network/mediasoup-client"]
+	path = network/mediasoup-client
+	url = git@github.com:Ahnyeohn/mediasoup-client.git
+	branch = fec-test
