@@ -1,6 +1,10 @@
 network/log/**/*.csv
 network/log/**/*.png
 network/log/**/*.txt
+network/log/**/*.pcapng
+network/log/frame/tshark/webrtc.pcapng
+network/log/*.pcap
 !network/log/frame/how_to_use.txt
 network/log/**/*.log
 network/log/**/*.pcapng/network/webrtc-m77-upstream/
+network/baseline/

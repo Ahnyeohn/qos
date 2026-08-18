@@ -108,6 +108,9 @@ def load_and_prepare_csv(csv_path: str, late_threshold_ms: float) -> pd.DataFram
 
         "lossRate",
 
+        # FEC redundancy (%)
+        "fecRedundancyPercent",
+
         # 3-class 분류용
         "decodeStartMs",
         "decodeFinishMs",
@@ -294,16 +297,16 @@ def plot_metrics(
         ax_predecode,
         ax_layer,
         ax_pacing_metrics,
+        ax_fec,
         ax_loss,
         ax_queue,
-        ax_residence,
     ) = plt.subplots(
         8,
         1,
         figsize=(16, 19),
         sharex=True,
         gridspec_kw={
-            "height_ratios": [2.2, 2.2, 1.8, 1.2, 1.8, 1.2, 1.8, 1.8]
+            "height_ratios": [2.2, 2.2, 1.8, 1.2, 1.8, 1.2, 1.2, 1.8]
         },
     )
 
@@ -418,7 +421,7 @@ def plot_metrics(
     ax_bitrate = ax_layer.twinx()
     ax_bitrate.plot(
         x,
-        df["gccAvailableBitrateMbps"],
+        df["availableBitrateMbps"],
         label="GCC bitrate",
         linewidth=1.8,
         alpha=0.9,
@@ -491,7 +494,33 @@ def plot_metrics(
     ax_pacing_metrics.legend(loc="best")
 
     # ============================================================
-    # 6. lossRate
+    # 6. FEC redundancy rate
+    #    각 frame이 어떤 redundancy percentage로 전송되었는지 표시
+    # ============================================================
+    ax_fec.step(
+        x,
+        df["fecRedundancyPercent"],
+        label="fecRedundancyPercent",
+        linewidth=2.0,
+        where="post",
+    )
+
+    # Adaptive FEC는 몇 개의 discrete rate를 사용하므로,
+    # 실제 CSV에 등장한 rate를 y-axis tick으로 표시한다.
+    fec_rates = np.sort(
+        df["fecRedundancyPercent"].dropna().unique()
+    )
+    if 0 < len(fec_rates) <= 10:
+        ax_fec.set_yticks(fec_rates)
+
+    ax_fec.axhline(0, color="black", linewidth=1.0, alpha=0.45)
+    ax_fec.set_ylabel("Redundancy (%)")
+    ax_fec.set_title("FEC Redundancy Rate per Frame")
+    ax_fec.grid(True, alpha=0.3)
+    ax_fec.legend(loc="best")
+
+    # ============================================================
+    # 7. lossRate
     #    기존 방식 그대로
     #    late/drop 구분 표시 안 함
     # ============================================================
@@ -509,8 +538,9 @@ def plot_metrics(
     ax_loss.set_title("Packet Loss Rate")
     ax_loss.grid(True, alpha=0.3)
     ax_loss.legend(loc="best")
+
     # ============================================================
-    # 7. queueResidenceMs
+    # 8. queueResidenceMs
     #    기존 방식 그대로
     #    late/drop 구분 표시 안 함
     # ============================================================
@@ -525,39 +555,10 @@ def plot_metrics(
 
     ax_queue.axhline(0, color="black", linewidth=1.0, alpha=0.45)
     ax_queue.set_ylabel("Milliseconds (ms)")
+    ax_queue.set_xlabel("Frame index")
     ax_queue.set_title("queueResidenceMs")
     ax_queue.grid(True, alpha=0.3)
     ax_queue.legend(loc="best")
-
-    # ============================================================
-    # 8. decodeQueueResidenceMs / frameBufferResidenceMs
-    #    기존 방식 그대로
-    #    late/drop 구분 표시 안 함
-    # ============================================================
-    ax_residence.plot(
-        x,
-        df["decodeQueueResidenceMs"],
-        label="decodeQueueResidenceMs",
-        linewidth=2.0,
-        alpha=0.9,
-        linestyle="-",
-    )
-
-    ax_residence.plot(
-        x,
-        df["frameBufferResidenceMs"],
-        label="frameBufferResidenceMs",
-        linewidth=2.0,
-        alpha=0.9,
-        linestyle="--",
-    )
-
-    ax_residence.axhline(0, color="black", linewidth=1.0, alpha=0.45)
-    ax_residence.set_ylabel("Residence (ms)")
-    ax_residence.set_xlabel("Frame index")
-    ax_residence.set_title("Decode Queue Residence and Frame Buffer Residence")
-    ax_residence.grid(True, alpha=0.3)
-    ax_residence.legend(loc="best")
 
     # ============================================================
     # spatial layer transition vertical lines
@@ -574,9 +575,9 @@ def plot_metrics(
         ax_predecode.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_layer.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_pacing_metrics.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
+        ax_fec.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_loss.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_queue.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
-        ax_residence.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
 
     # 분류 기준 설명
     ax_effective.text(
@@ -606,7 +607,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Plot decode slack, preDecodeWaiting, spatial layer/bitrate, "
-            "ACE/pacing/Camel burst, queueResidence, nominal slack, and residence metrics. "
+            "ACE/pacing/Camel burst, FEC redundancy, packet loss, and queueResidence metrics. "
             "Only late/dropped frames are circled where requested."
         )
     )
@@ -657,9 +658,9 @@ def main():
         out_path = args.output
     else:
         if args.pacing == 1:
-            out_path = "plots/effective_nominal_predecode_pacing_camel_metrics_residence_circled_pacing.png"
+            out_path = "plots/effective_nominal_predecode_pacing_camel_fec_metrics_circled_pacing.png"
         else:
-            out_path = "plots/effective_nominal_predecode_pacing_camel_metrics_residence_circled.png"
+            out_path = "plots/effective_nominal_predecode_pacing_camel_fec_metrics_circled.png"
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
