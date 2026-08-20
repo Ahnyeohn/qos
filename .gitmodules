@@ -10,3 +10,6 @@
 [submodule "network/mediasoup"]
 	path = network/mediasoup
 	url = https://github.com/Ahnyeohn/mediasoup.git
+[submodule "metric-collector/metric-collector"]
+	path = metric-collector/metric-collector
+	url = https://github.com/YoungRheeCho/Metric-Collector.git
