@@ -17,7 +17,7 @@ const VIEWER_COUNT = 10000;
 /*
  * 한 batch에서 동시에 접속할 viewer 수.
  */
-const BATCH_SIZE = 15;
+const BATCH_SIZE = 25;
 
 /*
  * 한 batch 완료 후 다음 batch까지 대기하는 시간.

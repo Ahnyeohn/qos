@@ -4,3 +4,5 @@ network/log/**/*.txt
 !network/log/frame/how_to_use.txt
 network/log/**/*.log
 network/log/**/*.pcapng
+# Node dependencies
+node_modules/

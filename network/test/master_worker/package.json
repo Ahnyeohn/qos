@@ -1,0 +1,11 @@
+{
+  "name": "viewer-flood-10000",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node viewer_master.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.58.0"
+  }
+}

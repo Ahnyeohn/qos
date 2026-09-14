@@ -8,10 +8,15 @@ import matplotlib.pyplot as plt
 INVALID_BIG_THRESHOLD = 1e18
 
 DEFAULT_LATE_THRESHOLD_MS = -5.0
+DEFAULT_LATE_THRESHOLD_MS = -5.0
+DEFAULT_FPS = 30.0
+DEFAULT_TICK_MINUTES = 2.0
 
 CLASS_SAFE_NORMAL = "SAFE_NORMAL"
 CLASS_LATE_NORMAL = "LATE_NORMAL"
 CLASS_DROPPED = "DROPPED"
+
+VIEWER_KEY_COLS = ["transportId", "consumerId", "producerId"]
 
 
 def to_numeric_clean(series: pd.Series) -> pd.Series:
@@ -114,6 +119,18 @@ def load_and_prepare_csv(csv_path: str, late_threshold_ms: float) -> pd.DataFram
         "max_wait",
     ]
 
+    viewer_id_cols = [
+        "transportId",
+        "consumerId",
+        "producerId",
+    ]
+
+    for col in viewer_id_cols:
+        if col not in df.columns:
+            df[col] = "unknown"
+        else:
+            df[col] = df[col].astype(str).str.strip()
+
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns in CSV: {missing}")
@@ -196,7 +213,8 @@ def load_and_prepare_csv(csv_path: str, late_threshold_ms: float) -> pd.DataFram
         errors="coerce",
     ).fillna(-1).astype(int)
 
-    df = df.sort_values("frameId").reset_index(drop=True)
+    sort_cols = [c for c in VIEWER_KEY_COLS if c in df.columns] + ["frameId"]
+    df = df.sort_values(sort_cols).reset_index(drop=True)
 
     return df
 
@@ -245,8 +263,75 @@ def add_late_drop_circles(
         )
 
 
-def print_summary(df: pd.DataFrame) -> None:
-    print(f"\n[INFO] loaded rows: {len(df)}")
+def add_time_gridlines(
+    axes,
+    n_frames: int,
+    fps: float,
+    tick_minutes: float,
+    label_ax=None,
+) -> None:
+    """
+    frame index 기준으로 tick_minutes 간격마다 세로줄.
+    30fps, 2분이면 3600 frame마다 한 줄.
+    """
+    step = int(round(fps * 60.0 * tick_minutes))
+    if step <= 0:
+        return
+
+    for idx in range(step, n_frames, step):
+        minutes = idx / fps / 60.0
+
+        for ax in axes:
+            ax.axvline(
+                idx,
+                color="tab:blue",
+                linestyle="--",
+                linewidth=1.2,
+                alpha=0.5,
+                zorder=1,
+            )
+
+        if label_ax is not None:
+            label_ax.annotate(
+                f"{minutes:.0f}m",
+                xy=(idx, 1.0),
+                xycoords=("data", "axes fraction"),
+                xytext=(2, 2),
+                textcoords="offset points",
+                fontsize=8,
+                color="tab:blue",
+                clip_on=False,
+            )
+
+
+def safe_name(s: str, max_len: int = 12) -> str:
+    s = str(s)
+    out = []
+    for ch in s:
+        if ch.isalnum() or ch in ["-", "_"]:
+            out.append(ch)
+        else:
+            out.append("_")
+    s = "".join(out)
+    if len(s) > max_len:
+        s = s[:max_len]
+    return s
+
+
+def viewer_label_from_group_key(group_key) -> str:
+    if not isinstance(group_key, tuple):
+        group_key = (group_key,)
+
+    parts = []
+    for col, value in zip(VIEWER_KEY_COLS, group_key):
+        parts.append(f"{col}={value}")
+
+    return ", ".join(parts)
+
+
+def print_summary(df: pd.DataFrame, label: str = "all") -> None:
+    print(f"\n[INFO] viewer: {label}")
+    print(f"[INFO] loaded rows: {len(df)}")
 
     print("\n[INFO] frame class counts:")
     print(
@@ -285,6 +370,9 @@ def plot_metrics(
     df: pd.DataFrame,
     out_path: str,
     late_threshold_ms: float,
+    viewer_label: str = "all",
+    fps: float = DEFAULT_FPS,
+    tick_minutes: float = DEFAULT_TICK_MINUTES,
 ) -> None:
     x = np.arange(len(df))
 
@@ -331,7 +419,7 @@ def plot_metrics(
     ax_effective.axhline(0, color="black", linewidth=1.0, alpha=0.45)
     ax_effective.set_ylabel("Milliseconds (ms)")
     ax_effective.set_title(
-        "renderMinusReceiveMs "
+        f"renderMinusReceiveMs - {viewer_label} "
         "(late normal / dropped frames circled)"
     )
     ax_effective.grid(True, alpha=0.3)
@@ -578,6 +666,25 @@ def plot_metrics(
         ax_queue.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
         ax_residence.axvline(idx, linestyle=":", linewidth=1.0, alpha=0.45)
 
+    all_axes = [
+        ax_effective,
+        ax_nominal,
+        ax_predecode,
+        ax_layer,
+        ax_pacing_metrics,
+        ax_loss,
+        ax_queue,
+        ax_residence,
+    ]
+
+    add_time_gridlines(
+        axes=all_axes,
+        n_frames=len(df),
+        fps=fps,
+        tick_minutes=tick_minutes,
+        label_ax=ax_effective,
+    )
+
     # 분류 기준 설명
     ax_effective.text(
         0.01,
@@ -595,7 +702,9 @@ def plot_metrics(
         },
     )
 
-    plt.tight_layout()
+    fig.suptitle(viewer_label, fontsize=11, y=0.995)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.985])
     plt.savefig(out_path, dpi=200)
     plt.close()
 
@@ -639,6 +748,20 @@ def parse_args():
         help="Optional custom output plot path",
     )
 
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=DEFAULT_FPS,
+        help="Frame rate used for time gridlines. Default: 30",
+    )
+
+    parser.add_argument(
+        "--tick-minutes",
+        type=float,
+        default=DEFAULT_TICK_MINUTES,
+        help="Vertical time gridline interval in minutes. Default: 2",
+    )
+
     return parser.parse_args()
 
 
@@ -672,13 +795,67 @@ def main():
         late_threshold_ms=args.late_threshold_ms,
     )
 
-    print_summary(df)
+    group_cols = [c for c in VIEWER_KEY_COLS if c in df.columns]
 
-    plot_metrics(
-        df=df,
-        out_path=out_path,
-        late_threshold_ms=args.late_threshold_ms,
-    )
+    if not group_cols:
+        print_summary(df, label="all")
+
+        plot_metrics(
+            df=df,
+            out_path=out_path,
+            late_threshold_ms=args.late_threshold_ms,
+            viewer_label="all",
+            fps=args.fps,
+            tick_minutes=args.tick_minutes,
+        )
+        return
+
+    base_dir = os.path.dirname(out_path)
+    base_name = os.path.splitext(os.path.basename(out_path))[0]
+    ext = os.path.splitext(out_path)[1]
+    if ext == "":
+        ext = ".png"
+
+    print("\n[INFO] viewer groups:")
+    group_sizes = df.groupby(group_cols, dropna=False).size().reset_index(name="rows")
+    print(group_sizes.to_string(index=False))
+
+    saved_paths = []
+
+    for group_key, viewer_df in df.groupby(group_cols, dropna=False):
+        if not isinstance(group_key, tuple):
+            group_key = (group_key,)
+
+        viewer_df = viewer_df.sort_values("frameId").reset_index(drop=True)
+
+        viewer_label = viewer_label_from_group_key(group_key)
+
+        short_parts = []
+        for col, value in zip(group_cols, group_key):
+            short_parts.append(f"{col}_{safe_name(value)}")
+
+        viewer_suffix = "__".join(short_parts)
+        viewer_out_path = os.path.join(
+            base_dir,
+            f"{base_name}__{viewer_suffix}{ext}",
+        )
+
+        print_summary(viewer_df, label=viewer_label)
+
+        plot_metrics(
+            df=viewer_df,
+            out_path=viewer_out_path,
+            late_threshold_ms=args.late_threshold_ms,
+            viewer_label=viewer_label,
+            fps=args.fps,
+            tick_minutes=args.tick_minutes,
+        )
+
+        saved_paths.append(viewer_out_path)
+
+    print("\n[INFO] saved viewer plots:")
+    for p in saved_paths:
+        print(p)
 
 
 if __name__ == "__main__":
