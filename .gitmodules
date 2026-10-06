@@ -14,3 +14,7 @@
 	path = network/mediasoup-client
 	url = git@github.com:Ahnyeohn/mediasoup-client.git
 	branch = fec-test
+[submodule "network/aware"]
+	path = network/aware
+	url = https://github.com/Ahnyeohn/aware.git
+	branch = qos

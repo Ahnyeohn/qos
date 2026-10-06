@@ -22,4 +22,7 @@ python3 summary_pacp.py
 python3 pacp.py
 echo ""
 
+echo "===== <cluster knn plots> ====="
+python3 knn_clusters.py --input csv/frame_records.csv --output-dir knn_cluster_plots
+
 echo "===== <DONE> ====="
