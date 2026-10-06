@@ -27,7 +27,7 @@ if (WORKER_COUNT <= 0) throw new Error('--workerCount must be > 0');
 
 const VIEWERS_PER_WORKER = Math.ceil(TOTAL_VIEWERS / WORKER_COUNT);
 const CHROMIUM_PATH = getArg('chromiumPath', '');
-const BASE_URL = getArg('baseUrl', 'https://10.20.13.186:5555');
+const BASE_URL = getArg('baseUrl', 'https://10.1.2.3:5555');
 const BATCH_SIZE = toInt(getArg('batchSize', '15'), 'batchSize');
 const BATCH_DELAY_MS = toInt(getArg('batchDelayMs', '0'), 'batchDelayMs');
 const WORKER_START_DELAY_MS = toInt(getArg('workerStartDelayMs', '1000'), 'workerStartDelayMs');

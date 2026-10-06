@@ -10,7 +10,7 @@ INVALID_BIG_THRESHOLD = 1e18
 DEFAULT_LATE_THRESHOLD_MS = -5.0
 DEFAULT_LATE_THRESHOLD_MS = -5.0
 DEFAULT_FPS = 30.0
-DEFAULT_TICK_MINUTES = 2.0
+DEFAULT_TICK_SECONDS = 10
 
 CLASS_SAFE_NORMAL = "SAFE_NORMAL"
 CLASS_LATE_NORMAL = "LATE_NORMAL"
@@ -267,19 +267,22 @@ def add_time_gridlines(
     axes,
     n_frames: int,
     fps: float,
-    tick_minutes: float,
+    tick_seconds: float,
     label_ax=None,
 ) -> None:
     """
-    frame index 기준으로 tick_minutes 간격마다 세로줄.
-    30fps, 2분이면 3600 frame마다 한 줄.
+    frame index 기준으로 tick_seconds 간격마다 세로줄.
+
+    예:
+        30 fps, 10초 -> 300 frame마다 한 줄.
     """
-    step = int(round(fps * 60.0 * tick_minutes))
+    step = int(round(fps * tick_seconds))
+
     if step <= 0:
         return
 
     for idx in range(step, n_frames, step):
-        minutes = idx / fps / 60.0
+        seconds = idx / fps
 
         for ax in axes:
             ax.axvline(
@@ -293,7 +296,7 @@ def add_time_gridlines(
 
         if label_ax is not None:
             label_ax.annotate(
-                f"{minutes:.0f}m",
+                f"{seconds:.0f}s",
                 xy=(idx, 1.0),
                 xycoords=("data", "axes fraction"),
                 xytext=(2, 2),
@@ -372,7 +375,7 @@ def plot_metrics(
     late_threshold_ms: float,
     viewer_label: str = "all",
     fps: float = DEFAULT_FPS,
-    tick_minutes: float = DEFAULT_TICK_MINUTES,
+    tick_seconds: float = DEFAULT_TICK_SECONDS,
 ) -> None:
     x = np.arange(len(df))
 
@@ -681,7 +684,7 @@ def plot_metrics(
         axes=all_axes,
         n_frames=len(df),
         fps=fps,
-        tick_minutes=tick_minutes,
+        tick_seconds=tick_seconds,
         label_ax=ax_effective,
     )
 
@@ -756,9 +759,9 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--tick-minutes",
+        "--tick-seconds",
         type=float,
-        default=DEFAULT_TICK_MINUTES,
+        default=DEFAULT_TICK_SECONDS,
         help="Vertical time gridline interval in minutes. Default: 2",
     )
 
@@ -806,7 +809,7 @@ def main():
             late_threshold_ms=args.late_threshold_ms,
             viewer_label="all",
             fps=args.fps,
-            tick_minutes=args.tick_minutes,
+            tick_seconds=args.tick_seconds,
         )
         return
 
@@ -848,7 +851,7 @@ def main():
             late_threshold_ms=args.late_threshold_ms,
             viewer_label=viewer_label,
             fps=args.fps,
-            tick_minutes=args.tick_minutes,
+            tick_seconds=args.tick_seconds,
         )
 
         saved_paths.append(viewer_out_path)

@@ -21,7 +21,7 @@ if (!ROOM_ID) {
   process.exit(1);
 }
 
-const BASE_URL = getArg('baseUrl', 'https://10.20.13.186:5555');
+const BASE_URL = getArg('baseUrl', 'https://10.1.2.3:5555');
 const VIEWER_COUNT = toInt(getArg('viewerCount', '250'), 'viewerCount');
 const VIEWER_OFFSET = toInt(getArg('viewerOffset', '0'), 'viewerOffset');
 const BATCH_SIZE = Math.max(1, toInt(getArg('batchSize', '15'), 'batchSize'));
