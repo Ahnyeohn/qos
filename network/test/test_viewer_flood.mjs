@@ -26,7 +26,7 @@ if (!ROOM_ID) {
 const BASE_URL =
   getArg(
     'baseUrl',
-    'https://10.20.13.186:5555'
+    'https://10.20.13.157:5555'
   );
 
 const VIEWER_COUNT =
@@ -774,7 +774,8 @@ async function connectViewer(
 
 
     const url =
-      `${BASE_URL}/loadtest.html` +
+//      `${BASE_URL}/loadtest.html` +
+      `${BASE_URL}` +
       `?roomId=${encodeURIComponent(ROOM_ID)}` +
       `&displayName=${encodeURIComponent(`viewer-${viewerNumber}`)}`;
 

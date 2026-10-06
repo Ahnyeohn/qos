@@ -50,16 +50,17 @@ spec:
       # private GHCR이면 주석 해제
       imagePullSecrets:
       - name: regcred
+      - name: ghcr-secret
 
-      securityContext:
-        seccompProfile:
-          type: Localhost
-          localhostProfile: allow-io-uring.json
+#      securityContext:
+#        seccompProfile:
+#          type: Localhost
+#          localhostProfile: allow-io-uring.json
     ## mediasoup-certs라는 Secret에 들어있는 파일들을 certs라는 볼륨 이름으로 쓰겠다
       volumes:
       - name: certs
         hostPath:
-          path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
+          path: /home/n2sl/qos/network/mediasoup-demo/server/certs
           type: Directory
       - name: edge-public-ips
         configMap:

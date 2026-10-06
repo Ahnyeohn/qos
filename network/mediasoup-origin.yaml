@@ -33,16 +33,17 @@ spec:
       # private GHCR이면 주석 해제
       imagePullSecrets:
       - name: regcred
+      - name: ghcr-secret
 
-      securityContext:
-        seccompProfile:
-          type: Localhost
-          localhostProfile: allow-io-uring.json
+#      securityContext:
+#        seccompProfile:
+#          type: Localhost
+#          localhostProfile: allow-io-uring.json
     ## mediasoup-certs라는 Secret에 들어있는 파일들을 certs라는 볼륨 이름으로 쓰겠다
       volumes:
       - name: certs
         hostPath:
-          path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
+          path: /home/n2sl/qos/network/mediasoup-demo/server/certs
           type: Directory
       ## origin의 expipe 위한 외부 ip url 세팅 (이미지 빌드 없이) 
       - name: mediasoup-origin-room-ts
@@ -60,8 +61,13 @@ spec:
               cpu: 500m
               memory: 512Mi
             limits:
+<<<<<<< Updated upstream
               cpu: "4"
               memory: 2Gi
+=======
+              cpu: 1
+              memory: 1Gi
+>>>>>>> Stashed changes
         env:
         - name: NODE_ENV
           value: "production"
