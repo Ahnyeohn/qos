@@ -46,11 +46,9 @@ spec:
           matchLabels:
             app: mediasoup-edge
 
-
       # private GHCR이면 주석 해제
       imagePullSecrets:
       - name: regcred
-      - name: ghcr-secret
 
 #      securityContext:
 #        seccompProfile:
@@ -60,7 +58,7 @@ spec:
       volumes:
       - name: certs
         hostPath:
-          path: /home/n2sl/qos/network/mediasoup-demo/server/certs
+          path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
           type: Directory
       - name: edge-public-ips
         configMap:
@@ -71,9 +69,9 @@ spec:
 
       containers:
       - name: mediasoup-server
-        image: ghcr.io/ahnyeohn/mediasoup-server-edge:v1
-        # imagePullPolicy: Always
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/ahnyeohn/mediasoup-server-edge:v2
+        imagePullPolicy: Always
+        # imagePullPolicy: IfNotPresent
         resources:
             requests:
               cpu: 500m
@@ -101,6 +99,16 @@ spec:
               fieldPath: metadata.namespace
         - name: MEDIASOUP_NUM_WORKERS
           value: "1"
+        - name: SIGNALING_DOMAIN
+          value: "10.20.13.220"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: PIPE_LISTEN_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         ## PUBLIC_IP는 직접 env로 넣지 않고, ConfigMap 파일에서 읽어서 export
         ports:
         - name: signaling
@@ -131,9 +139,12 @@ spec:
         args:
         - |
           export PUBLIC_IP="$(cat /etc/edge-public-ips/${POD_NAME})"
+          export MEDIASOUP_ANNOUNCED_ADDRESS="${PUBLIC_IP}"
+
           echo "POD_NAME=${POD_NAME}"
           echo "SERVER_IP=${SERVER_IP}"
-          echo "PUBLIC_IP=${PUBLIC_IP}"
+          echo "PIPE_LISTEN_IP=${PIPE_LISTEN_IP}"
+          echo "MEDIASOUP_ANNOUNCED_ADDRESS=${MEDIASOUP_ANNOUNCED_ADDRESS}"
 
           if [ -z "${PUBLIC_IP}" ]; then
             echo "ERROR: PUBLIC_IP is empty for POD_NAME=${POD_NAME}"
@@ -147,7 +158,7 @@ spec:
         # 그래서 origin의 엣지 리스트는 server ip를 사용한다.
 
       - name: mediasoup-app
-        image: ghcr.io/ahnyeohn/mediasoup-app-edge:v1
+        image: ghcr.io/ahnyeohn/mediasoup-app-edge:v2
         imagePullPolicy: Always
         resources:
           requests:

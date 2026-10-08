@@ -17,7 +17,8 @@ spec:
     spec:
       # 오리진에서 edge의 엔드포인트를 접근하기 위한 권한이다.
       # 레플리카 수가 증가함에 따라 새로 생기는 엣지의 엔드포인트를 갱신하기 위해 사용
-      serviceAccountName: origin-sa
+      ## 하지만 수정된 v2에서는 Headless Service DNS를 쓰기 때문에 Kubernetes API 접근이 불필요 => 안써도 됨
+      # serviceAccountName: origin-sa
 
       ## 노드에서 레플리카를 2개 이상으로 늘리려면 호스트 네트워크 맟 아래 dnspolicy는 주석 처리해야 함
       hostNetwork: true
@@ -33,7 +34,6 @@ spec:
       # private GHCR이면 주석 해제
       imagePullSecrets:
       - name: regcred
-      - name: ghcr-secret
 
 #      securityContext:
 #        seccompProfile:
@@ -43,31 +43,22 @@ spec:
       volumes:
       - name: certs
         hostPath:
-          path: /home/n2sl/qos/network/mediasoup-demo/server/certs
+          path: /home/n2sl/yeon/qos/network/mediasoup-demo/server/certs
           type: Directory
-      ## origin의 expipe 위한 외부 ip url 세팅 (이미지 빌드 없이) 
-      - name: mediasoup-origin-room-ts
-        configMap:
-          name: mediasoup-origin-room-ts
         # secret:
         #   secretName: mediasoup-certs
 
       containers:
       - name: mediasoup-server
-        image: ghcr.io/ahnyeohn/mediasoup-server-origin:v1
+        image: ghcr.io/ahnyeohn/mediasoup-server-origin:v2
         imagePullPolicy: Always
         resources:
             requests:
               cpu: 500m
               memory: 512Mi
             limits:
-<<<<<<< Updated upstream
               cpu: "4"
               memory: 2Gi
-=======
-              cpu: 1
-              memory: 1Gi
->>>>>>> Stashed changes
         env:
         - name: NODE_ENV
           value: "production"
@@ -77,6 +68,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
+        - name: PIPE_LISTEN_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: REMOTE_PIPE_SERVICE_DNS
+          value: "mediasoup-edge-headless.qos.svc.cluster.local"
         ports:
         - name: signaling
           containerPort: 4443
@@ -88,13 +85,9 @@ spec:
         - name: certs
           mountPath: /work/mediasoup-demo/server/certs
           readOnly: true
-        - name: mediasoup-origin-room-ts
-          mountPath: /work/mediasoup-demo/server/src/Room.origin.ts
-          subPath: Room.origin.ts
-          readOnly: true
 
       - name: mediasoup-app
-        image: ghcr.io/ahnyeohn/mediasoup-app-origin:v1
+        image: ghcr.io/ahnyeohn/mediasoup-app-origin:v2
         imagePullPolicy: Always
         resources:
           requests:
