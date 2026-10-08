@@ -15,21 +15,12 @@ spec:
       labels:
         app: mediasoup-edge
     spec:
-      ## 노드에서 레플리카를 2개 이상으로 늘리려면 호스트 네트워크 맟 아래 dnspolicy는 주석 처리해야 함
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      
+      # Multiple SFU replicas run on the same edge node.
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
+
       nodeSelector:
         role: edge
-      
-      ## 임시 설정: hostnetwork 모드에서 각 노드당 레플리카를 배포하기 위한 임시 설정임
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app: mediasoup-edge
-            topologyKey: kubernetes.io/hostname
 
       # private GHCR이면 주석 해제
       imagePullSecrets:
@@ -48,7 +39,7 @@ spec:
 
       containers:
       - name: mediasoup-server
-        image: ghcr.io/ahnyeohn/mediasoup-server-edge:v1
+        image: ghcr.io/ahnyeohn/mediasoup-server-edge:v2
         imagePullPolicy: Always
         resources:
             requests:
@@ -79,7 +70,7 @@ spec:
           readOnly: true
 
       - name: mediasoup-app
-        image: ghcr.io/ahnyeohn/mediasoup-app-edge:v1
+        image: ghcr.io/ahnyeohn/mediasoup-app-edge:v2
         imagePullPolicy: Always
         resources:
           requests:
