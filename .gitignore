@@ -8,3 +8,5 @@ network/log/*.pcap
 network/log/**/*.log
 network/log/**/*.pcapng/network/webrtc-m77-upstream/
 network/baseline/
+
+pki/output
