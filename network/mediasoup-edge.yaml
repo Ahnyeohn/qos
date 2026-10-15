@@ -109,6 +109,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        - name: QOS_CSV_LOGGING
+          value: "off"
+        - name: SFU_KNN_ENABLED
+          value: "0"
+        - name: SFU_ACE_PACING_ENABLED
+          value: "1"
+        - name: SFU_FIXED_FEC_PF
+          value: "64"
         ## PUBLIC_IP는 직접 env로 넣지 않고, ConfigMap 파일에서 읽어서 export
         ports:
         - name: signaling
